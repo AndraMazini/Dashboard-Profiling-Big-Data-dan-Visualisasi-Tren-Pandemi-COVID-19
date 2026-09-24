@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard EDA Kesehatan Global</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container py-4">
+        <h2 class="mb-4 fw-bold text-primary">Dashboard Exploratory Data Analysis (EDA)</h2>
+        
+        <!-- Cards Ringkasan -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm p-3">
+                    <span class="text-muted small">Total Dimensi Data</span>
+                    <h3 class="fw-bold m-0 text-dark">{{ rows }} <small class="fs-6 text-muted">Baris</small></h3>
+                    <small class="text-secondary">{{ cols }} Kolom Ditangani</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm p-3">
+                    <span class="text-muted small">Beban Memori RAM</span>
+                    <h3 class="fw-bold m-0 text-danger">{{ memory }} <small class="fs-6 text-muted">MB</small></h3>
+                    <small class="text-secondary">Uji Skala Big Data</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm p-3">
+                    <span class="text-muted small">Status File Sampel (1%)</span>
+                    <h3 class="fw-bold m-0 text-success">Tersimpan</h3>
+                    <small class="text-secondary">Path: <code>data/WDI_sample.csv</code></small>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Paling & Paling Sedikit Terdampak -->
+            <div class="col-12">
+                <div class="card border-0 shadow-sm p-3">
+                    <h5 class="fw-bold mb-3">Negara Terdampak COVID-19 (Terbanyak vs Paling Sedikit)</h5>
+                    {% if plot_countries %}
+                        <img src="data:image/png;base64,{{ plot_countries }}" class="img-fluid rounded mb-3" alt="Grafik Negara Terdampak">
+                    {% else %}
+                        <p class="text-muted">Grafik tidak dapat dimuat.</p>
+                    {% endif %}
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle">
+                                    <thead class="table-danger">
+                                        <tr>
+                                            <th>10 Terbanyak</th>
+                                            <th>Total Kasus</th>
+                                            <th>Total Kematian</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in top_countries %}
+                                        <tr>
+                                            <td>{{ item[0] }}</td>
+                                            <td>{{ "{:,}".format(item[1]) }}</td>
+                                            <td>{{ "{:,}".format(item[2]) }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle">
+                                    <thead class="table-success">
+                                        <tr>
+                                            <th>10 Paling Sedikit</th>
+                                            <th>Total Kasus</th>
+                                            <th>Total Kematian</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in bottom_countries %}
+                                        <tr>
+                                            <td>{{ item[0] }}</td>
+                                            <td>{{ "{:,}".format(item[1]) }}</td>
+                                            <td>{{ "{:,}".format(item[2]) }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analisis 1 & 2 -->
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm p-3 h-100">
+                    <h5 class="fw-bold mb-3">Case Fatality Rate (CFR) per Negara</h5>
+                    {% if plot_cfr %}
+                        <img src="data:image/png;base64,{{ plot_cfr }}" class="img-fluid rounded" alt="Grafik CFR">
+                    {% else %}
+                        <p class="text-muted">Grafik tidak dapat dimuat.</p>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm p-3 h-100">
+                    <h5 class="fw-bold mb-3">Korelasi Vaksinasi vs Kematian</h5>
+                    {% if plot_vaccine %}
+                        <img src="data:image/png;base64,{{ plot_vaccine }}" class="img-fluid rounded" alt="Grafik Korelasi Vaksin">
+                    {% else %}
+                        <p class="text-muted">Grafik tidak dapat dimuat.</p>
+                    {% endif %}
+                    {% if vaccine_r %}
+                        <div class="alert alert-info py-2 mt-2 mb-0">
+                            Korelasi Pearson (r) = <strong>{{ vaccine_r }}</strong> &mdash;
+                            {% if vaccine_r|float < 0 %}vaksinasi tinggi cenderung menekan kematian.{% else %}korelasi positif &mdash; perlu faktor lain (usia, kepadatan).{% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Analisis 3 -->
+            <div class="col-12">
+                <div class="card border-0 shadow-sm p-3">
+                    <h5 class="fw-bold mb-3">Tren Kasus Baru per Kontinen</h5>
+                    {% if plot_continent %}
+                        <img src="data:image/png;base64,{{ plot_continent }}" class="img-fluid rounded" alt="Grafik Tren Kontinen">
+                    {% else %}
+                        <p class="text-muted">Grafik tidak dapat dimuat.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Visualisasi -->
+            <div class="col-md-7">
+                <div class="card border-0 shadow-sm p-3 h-100">
+                    <h5 class="fw-bold mb-3">Tren Kasus Baru per Tahun</h5>
+                    {% if plot_url %}
+                        <img src="data:image/png;base64,{{ plot_url }}" class="img-fluid rounded" alt="Grafik Tren">
+                    {% else %}
+                        <p class="text-muted">Grafik tidak dapat dimuat.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Missing Values Table -->
+            <div class="col-md-5">
+                <div class="card border-0 shadow-sm p-3 h-100">
+                    <h5 class="fw-bold mb-3">Top 10 Missing Values</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Nama Kolom</th>
+                                    <th>Data Kosong</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in missing %}
+                                <tr>
+                                    <td><code>{{ item[0] }}</code></td>
+                                    <td><span class="badge bg-warning text-dark">{{ "{:,}".format(item[1]) }}</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
