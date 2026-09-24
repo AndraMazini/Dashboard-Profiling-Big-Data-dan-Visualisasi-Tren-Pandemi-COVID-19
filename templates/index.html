@@ -34,6 +34,30 @@
             </div>
         </div>
 
+        <div class="alert alert-primary d-flex flex-wrap gap-2 align-items-center mb-4">
+            <span class="fw-bold me-2">Target Hasil Analisis:</span>
+            <span class="badge bg-primary">1. Titik Rawan (Sebaran)</span>
+            <span class="badge bg-primary">2. Penyakit Kronis</span>
+            <span class="badge bg-primary">3. Kesenjangan Kualitas Data</span>
+            <span class="badge bg-primary">4. Strategi Preventif</span>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <!-- Target 1: Choropleth -->
+            <div class="col-12">
+                <div class="card border-0 shadow-sm p-3">
+                    <h4 class="fw-bold mb-2">1. Titik Rawan (Sebaran) COVID-19 per Negara</h4>
+                    <p class="text-muted small mb-2">Peta interaktif: arahkan kursor ke negara untuk melihat detail kasus,
+                        kasus per juta penduduk, dan kematian.</p>
+                    {% if map_html %}
+                        {{ map_html | safe }}
+                    {% else %}
+                        <p class="text-muted">Peta tidak dapat dimuat.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
         <div class="row g-4">
             <!-- Paling & Paling Sedikit Terdampak -->
             <div class="col-12">
@@ -129,6 +153,81 @@
                     <h5 class="fw-bold mb-3">Tren Kasus Baru per Kontinen</h5>
                     {% if plot_continent %}
                         <img src="data:image/png;base64,{{ plot_continent }}" class="img-fluid rounded" alt="Grafik Tren Kontinen">
+                    {% else %}
+                        <p class="text-muted">Grafik tidak dapat dimuat.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Target 2 & 4 -->
+            <div class="col-md-7">
+                <div class="card border-0 shadow-sm p-3 h-100">
+                    <h4 class="fw-bold mb-2">2. Beban Penyakit Kronis</h4>
+                    {% if plot_chronic %}
+                        <img src="data:image/png;base64,{{ plot_chronic }}" class="img-fluid rounded" alt="Grafik Penyakit Kronis">
+                    {% else %}
+                        <p class="text-muted">Grafik tidak dapat dimuat.</p>
+                    {% endif %}
+                    {% if chronic_top %}
+                    <div class="table-responsive mt-2">
+                        <table class="table table-sm table-hover align-middle">
+                            <thead class="table-warning">
+                                <tr>
+                                    <th>Negara</th>
+                                    <th>Prevalensi Diabetes (%)</th>
+                                    <th>Rate Kematian Kardiovaskuler</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in chronic_top %}
+                                <tr>
+                                    <td>{{ row[0] }}</td>
+                                    <td>{{ "%.1f"|format(row[1]) }}</td>
+                                    <td>{{ "%.1f"|format(row[2]) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-5">
+                <div class="card border-0 shadow-sm p-3 h-100">
+                    <h4 class="fw-bold mb-2">4. Strategi Kesehatan Preventif</h4>
+                    {% if prevention_points %}
+                        <ul class="list-group list-group-flush">
+                            {% for point in prevention_points %}
+                            <li class="list-group-item">{{ point }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted">Belum ada insight yang dihasilkan.</p>
+                    {% endif %}
+                    <hr>
+                    <p class="text-muted small mb-0">
+                        <strong>Cara membaca:</strong> Big Data memungkinkan pemantauan harian per negara
+                        (jutaan baris). Temuan di atas diterjemahkan menjadi prioritas tindakan preventif:
+                        vaksinasi, skrining komorbid, dan penguatan kapasitas fasilitas kesehatan.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Target 3 -->
+            <div class="col-12">
+                <div class="card border-0 shadow-sm p-3">
+                    <h4 class="fw-bold mb-2">3. Kesenjangan Kualitas Data</h4>
+                    <p class="text-muted small mb-2">
+                        Contoh nyata: seperti hasil <strong>tes HbA1c</strong> (pemantauan diabetes) yang sering
+                        hilang/kosong di data kesehatan, kolom klinis pada WDI juga memiliki kekosongan.
+                        Warna merah = &ge;50% data kosong, oranye = 20-49%, hijau = &lt;20%.
+                    </p>
+                    {% if plot_quality %}
+                        <img src="data:image/png;base64,{{ plot_quality }}" class="img-fluid rounded" alt="Grafik Kualitas Data">
                     {% else %}
                         <p class="text-muted">Grafik tidak dapat dimuat.</p>
                     {% endif %}

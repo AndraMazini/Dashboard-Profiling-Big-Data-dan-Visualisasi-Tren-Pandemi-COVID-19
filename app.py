@@ -5,6 +5,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pandas as pd
+import plotly.express as px
 from flask import Flask, render_template
 
 app = Flask(__name__)
@@ -40,6 +41,11 @@ def dashboard():
     plot_vaccine = ''
     vaccine_r = ''
     plot_continent = ''
+    map_html = ''
+    plot_chronic = ''
+    plot_quality = ''
+    chronic_top = []
+    prevention_points = []
     if 'location' in df.columns and 'total_cases' in df.columns and 'total_deaths' in df.columns and 'iso_code' in df.columns:
         df_countries = df[
             df['iso_code'].notna()
@@ -141,6 +147,120 @@ def dashboard():
                 plot_vaccine = base64.b64encode(img_vaccine.getvalue()).decode('utf-8')
                 plt.close(fig)
 
+        # Target 1: Titik rawan (sebaran) - choropleth peta dunia
+        if 'new_cases_per_million' in df_countries.columns:
+            map_df = (
+                df_countries.groupby('location')
+                .agg(
+                    iso_code=('iso_code', 'first'),
+                    continent=('continent', 'first'),
+                    total_cases=('total_cases', 'max'),
+                    new_cases_per_million=('new_cases_per_million', 'max'),
+                    total_deaths=('total_deaths', 'max'),
+                )
+                .reset_index()
+            )
+            fig_map = px.choropleth(
+                map_df,
+                locations='iso_code',
+                color='total_cases',
+                hover_name='location',
+                hover_data={
+                    'iso_code': False,
+                    'continent': True,
+                    'total_cases': ':,.0f',
+                    'new_cases_per_million': ':,.0f',
+                    'total_deaths': ':,.0f',
+                },
+                color_continuous_scale='Reds',
+                projection='natural earth',
+                title='Sebaran Total Kasus COVID-19 per Negara (Titik Rawan)',
+            )
+            fig_map.update_layout(
+                margin=dict(l=0, r=0, t=50, b=0),
+                coloraxis_colorbar=dict(title='Total Kasus'),
+            )
+            map_html = fig_map.to_html(
+                full_html=False, include_plotlyjs='cdn'
+            )
+
+        # Target 2: Beban penyakit kronis (chronic disease burden)
+        if 'diabetes_prevalence' in df_countries.columns and 'cardiovasc_death_rate' in df_countries.columns:
+            chronic = (
+                df_countries.groupby('location')
+                .agg(
+                    diabetes=('diabetes_prevalence', 'max'),
+                    cardio=('cardiovasc_death_rate', 'max'),
+                )
+                .dropna()
+                .reset_index()
+            )
+            chronic = chronic[chronic['diabetes'] > 0]
+            chronic['skor_kronis'] = chronic['diabetes'] + chronic['cardio'] / 100
+            chronic_top = (
+                chronic.sort_values('skor_kronis', ascending=False)
+                .head(15)[['location', 'diabetes', 'cardio']]
+                .values.tolist()
+            )
+
+            fig, ax = plt.subplots(figsize=(10, 6))
+            top15 = chronic.sort_values('skor_kronis', ascending=False).head(15)
+            ax.barh(
+                top15['location'][::-1],
+                top15['diabetes'][::-1],
+                color='#fd7e14',
+                label='Prevalensi Diabetes (%)',
+            )
+            ax.barh(
+                top15['location'][::-1],
+                (top15['cardio'] / 100)[::-1],
+                color='#dc3545',
+                alpha=0.7,
+                label='Rate Kematian Kardiovaskuler (dibagi 100)',
+            )
+            ax.set_title('Beban Penyakit Kronis Tertinggi (Diabetes & Kardiovaskuler)')
+            ax.set_xlabel('Nilai (baca legenda)')
+            ax.legend(fontsize=8)
+            ax.grid(True, linestyle='--', alpha=0.5)
+            plt.tight_layout()
+            img_chronic = io.BytesIO()
+            fig.savefig(img_chronic, format='png')
+            img_chronic.seek(0)
+            plot_chronic = base64.b64encode(img_chronic.getvalue()).decode('utf-8')
+            plt.close(fig)
+
+            # Komorbiditas vs keparahan COVID (CFR)
+            chronic_cfr = chronic.merge(
+                cfr_data[['location', 'cfr']], on='location', how='inner'
+            )
+            if len(chronic_cfr) > 10:
+                r_comorbid = chronic_cfr['skor_kronis'].corr(chronic_cfr['cfr'])
+                prevention_points.append(
+                    f'Korelasi beban penyakit kronis dengan CFR COVID (r = {r_comorbid:.2f}): '
+                    'negara/kota dengan tingkat penyakit kronis tinggi perlu prioritas '
+                    'pencegahan & kapasitas RS lebih besar.'
+                )
+
+        # Target 4: Insight untuk strategi kesehatan preventif
+        if vaccine_r:
+            r_val = float(vaccine_r)
+            if r_val < 0:
+                prevention_points.append(
+                    'Cakupan vaksinasi tinggi berkorelasi negatif dengan kematian '
+                    '(r = {:.2f}) -> perkuat program imunisasi & booster sebagai pencegahan.'.format(r_val)
+                )
+            else:
+                prevention_points.append(
+                    'Korelasi vaksinasi vs kematian positif (r = {:.2f}) -> indikasi '
+                    'pengaruh faktor usia/pendapatan; tetap dorong vaksin + skrining komorbid.'.format(r_val)
+                )
+        if chronic_top:
+            d_top = chronic_top[0]
+            prevention_points.append(
+                f'Prioritas skrining penyakit kronis per negara, mulai dari {d_top[0]} '
+                f'(diabetes {d_top[1]:.1f}%). Deteksi dini = pencegahan komplikasi.'
+            )
+
     # Analisis 3: Tren kasus baru per kontinen (agregasi bulanan)
     if 'date' in df.columns and 'new_cases_per_million' in df.columns and 'continent' in df.columns:
         cont = df[df['continent'].notna()].copy()
@@ -165,6 +285,33 @@ def dashboard():
         fig.savefig(img_continent, format='png')
         img_continent.seek(0)
         plot_continent = base64.b64encode(img_continent.getvalue()).decode('utf-8')
+        plt.close(fig)
+
+    # Target 3: Kesenjangan kualitas data (% data kosong pada kolom klinis utama)
+    quality_cols = [
+        'new_cases', 'total_deaths', 'reproduction_rate',
+        'icu_patients', 'hosp_patients', 'total_tests', 'total_vaccinations',
+        'diabetes_prevalence', 'cardiovasc_death_rate', 'life_expectancy',
+    ]
+    quality_cols = [c for c in quality_cols if c in df.columns]
+    pct_missing = (df[quality_cols].isnull().mean() * 100).sort_values().round(1)
+    if len(pct_missing) > 0:
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.barh(
+            pct_missing.index,
+            pct_missing.values,
+            color=pct_missing.apply(
+                lambda x: '#dc3545' if x >= 50 else ('#fd7e14' if x >= 20 else '#198754')
+            ),
+        )
+        ax.set_title('Kesenjangan Kualitas Data: % Data Kosong per Kolom Klinis')
+        ax.set_xlabel('% Data Kosong (Missing)')
+        ax.grid(True, linestyle='--', alpha=0.5)
+        plt.tight_layout()
+        img_quality = io.BytesIO()
+        fig.savefig(img_quality, format='png')
+        img_quality.seek(0)
+        plot_quality = base64.b64encode(img_quality.getvalue()).decode('utf-8')
         plt.close(fig)
 
     if 'date' in df.columns and 'new_cases' in df.columns:
@@ -206,6 +353,11 @@ def dashboard():
         plot_vaccine=plot_vaccine,
         vaccine_r=vaccine_r,
         plot_continent=plot_continent,
+        map_html=map_html,
+        plot_chronic=plot_chronic,
+        chronic_top=chronic_top,
+        plot_quality=plot_quality,
+        prevention_points=prevention_points,
     )
 
 
